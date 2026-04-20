@@ -1,0 +1,11 @@
+{
+  "name": "place-alert-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node local-server.js",
+    "dev:vercel": "vercel dev",
+    "start": "node local-server.js"
+  }
+}
