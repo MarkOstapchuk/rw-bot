@@ -24,8 +24,28 @@ function normalizeSpaces(value) {
     .trim();
 }
 
-function wagonToItem(rawData, tariff, car) {
+function filterPlaces(places, seatFilter) {
+  return places.filter((place) => {
+    const num = Number(place);
+    if (Number.isNaN(num)) return false;
+
+    switch (seatFilter) {
+      case 'lower_non_side':
+        // Нижние не боковые полки (1, 3, 5, ..., 35)
+        return num >= 1 && num <= 35 && num % 2 !== 0;
+      case 'lower':
+        // Все нижние полки, включая боковые (37..53)
+        return num % 2 !== 0;
+      case 'all':
+      default:
+        return true;
+    }
+  });
+}
+
+function wagonToItem(rawData, tariff, car, seatFilter = 'lower_non_side') {
   const emptyPlaces = Array.isArray(car.emptyPlaces) ? car.emptyPlaces : [];
+  const targetPlaces = filterPlaces(emptyPlaces, seatFilter);
 
   return {
     trainNumber: normalizeSpaces(rawData.trainNumber),
@@ -36,20 +56,21 @@ function wagonToItem(rawData, tariff, car) {
     departureTime: normalizeSpaces(rawData.route?.startTime),
     carriageType: normalizeSpaces(tariff.type || rawData.carType),
     carriageNumber: normalizeSpaces(car.number),
-    placesCount: emptyPlaces.length,
-    places: emptyPlaces,
+    placesCount: targetPlaces.length,
+    places: targetPlaces,
+    totalPlacesCount: emptyPlaces.length,
     priceByn: normalizeSpaces(tariff.price_byn)
   };
 }
 
-function extractItems(rawData) {
+function extractItems(rawData, seatFilter = 'lower_non_side') {
   const tariffs = Array.isArray(rawData?.tariffs) ? rawData.tariffs : [];
   const items = [];
 
   for (const tariff of tariffs) {
     const cars = Array.isArray(tariff?.cars) ? tariff.cars : [];
     for (const car of cars) {
-      items.push(wagonToItem(rawData, tariff, car));
+      items.push(wagonToItem(rawData, tariff, car, seatFilter));
     }
   }
 
@@ -83,14 +104,21 @@ function filterItems(items, cfg) {
   });
 }
 
-function formatItem(item, index) {
+function formatItem(item, index, seatFilter = 'lower_non_side') {
   const header =
     `${index + 1}. Поезд ${item.trainNumber} (${item.trainType}) ` +
     `${item.from} -> ${item.to}, ${item.date} ${item.departureTime}`;
 
+  const placeLabel =
+    seatFilter === 'lower_non_side'
+      ? 'Свободно нижних (не боковых) мест'
+      : seatFilter === 'lower'
+        ? 'Свободно нижних мест'
+        : 'Свободно мест';
+
   const body = [
     `Вагон: ${item.carriageNumber} (${item.carriageType})`,
-    `Свободно мест: ${item.placesCount}`,
+    `${placeLabel}: ${item.placesCount} (из ${item.totalPlacesCount} всего)`,
     `Места: ${item.places.join(', ')}`,
     item.priceByn ? `Цена BYN: ${item.priceByn}` : null
   ]
@@ -170,6 +198,7 @@ export default async function handler(req, res) {
       .filter(Boolean),
     minAvailable: process.env.MIN_AVAILABLE ? Number(process.env.MIN_AVAILABLE) : 1,
     maxResults: process.env.MAX_RESULTS ? Number(process.env.MAX_RESULTS) : 5,
+    seatFilter: process.env.SEAT_FILTER || 'lower_non_side',
     telegramToken: process.env.TELEGRAM_BOT_TOKEN,
     telegramChatId: process.env.TELEGRAM_CHAT_ID,
     schedulerToken: process.env.SCHEDULER_TOKEN || process.env.CRON_SECRET,
@@ -182,7 +211,7 @@ export default async function handler(req, res) {
     }
 
     const rawData = await fetchSource(cfg);
-    const items = extractItems(rawData);
+    const items = extractItems(rawData, cfg.seatFilter);
     const matches = filterItems(items, cfg);
 
     if (matches.length === 0) {
@@ -192,8 +221,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, wagonsTotal: items.length, matches: 0 });
     }
 
-    const lines = matches.slice(0, cfg.maxResults).map((item, i) => formatItem(item, i));
-    const message = ['Найдены свободные места:', '', ...lines].join('\n\n');
+    const headerTitle =
+      cfg.seatFilter === 'lower_non_side'
+        ? 'Найдены нижние (не боковые) места:'
+        : cfg.seatFilter === 'lower'
+          ? 'Найдены нижние места:'
+          : 'Найдены свободные места:';
+
+    const lines = matches.slice(0, cfg.maxResults).map((item, i) => formatItem(item, i, cfg.seatFilter));
+    const message = [headerTitle, '', ...lines].join('\n\n');
     await sendTelegram(message, cfg);
 
     return res.status(200).json({

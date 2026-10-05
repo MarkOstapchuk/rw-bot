@@ -3,11 +3,12 @@
 Бот проверяет наличие мест на `pass.rw.by`, фильтрует вагоны и отправляет уведомление в Telegram.
 
 ## Что уже зашито
-- В [api/check.js](/Users/user/WebstormProjects/bot-rw/api/check.js) встроен ваш `GET` URL.
+- В [api/check.js](api/check.js) встроен базовый `GET` URL.
 - Встроены базовые заголовки запроса (включая `X-Requested-With`, `User-Agent`, `Cookie`).
 - Логика фильтрации под ответ:
   - `tariffs[].cars[].emptyPlaces`
-  - если `emptyPlaces.length >= MIN_AVAILABLE`, вагон считается подходящим.
+  - Фильтрация мест: по умолчанию только нижние не боковые (нечётные 1–35).
+  - Если количество подходящих мест `>= MIN_AVAILABLE`, вагон считается подходящим.
 
 ## Переменные окружения
 Создайте `.env.local` из примера:
@@ -21,7 +22,8 @@ cp .env.example .env.local
 - `SCHEDULER_TOKEN`
 
 Опциональные:
-- `TARGET_URL` (если захотите поменять маршрут/дату)
+- `SEAT_FILTER` (`lower_non_side` [по умолчанию], `lower`, `all`)
+- `TARGET_URL` (маршрут, номер поезда, дата и тип вагона)
 - `REQUEST_HEADERS_JSON` (если нужно обновить cookie/session)
 - `INCLUDE_KEYWORDS`, `EXCLUDE_KEYWORDS`
 - `MIN_AVAILABLE`, `MAX_RESULTS`, `ALWAYS_NOTIFY`
