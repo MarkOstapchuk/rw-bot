@@ -43,7 +43,7 @@ function filterPlaces(places, seatFilter) {
   });
 }
 
-function wagonToItem(rawData, tariff, car, seatFilter = 'lower_non_side') {
+function wagonToItem(rawData, tariff, car, seatFilter = 'all') {
   const emptyPlaces = Array.isArray(car.emptyPlaces) ? car.emptyPlaces : [];
   const targetPlaces = filterPlaces(emptyPlaces, seatFilter);
 
@@ -63,7 +63,7 @@ function wagonToItem(rawData, tariff, car, seatFilter = 'lower_non_side') {
   };
 }
 
-function extractItems(rawData, seatFilter = 'lower_non_side') {
+function extractItems(rawData, seatFilter = 'all') {
   const tariffs = Array.isArray(rawData?.tariffs) ? rawData.tariffs : [];
   const items = [];
 
@@ -104,21 +104,21 @@ function filterItems(items, cfg) {
   });
 }
 
-function formatItem(item, index, seatFilter = 'lower_non_side') {
+function formatItem(item, index, seatFilter = 'all') {
   const header =
     `${index + 1}. Поезд ${item.trainNumber} (${item.trainType}) ` +
     `${item.from} -> ${item.to}, ${item.date} ${item.departureTime}`;
 
   const placeLabel =
     seatFilter === 'lower_non_side'
-      ? 'Свободно нижних (не боковых) мест'
+      ? `Свободно нижних (не боковых) мест: ${item.placesCount} (из ${item.totalPlacesCount} всего)`
       : seatFilter === 'lower'
-        ? 'Свободно нижних мест'
-        : 'Свободно мест';
+        ? `Свободно нижних мест: ${item.placesCount} (из ${item.totalPlacesCount} всего)`
+        : `Свободно мест: ${item.placesCount}`;
 
   const body = [
     `Вагон: ${item.carriageNumber} (${item.carriageType})`,
-    `${placeLabel}: ${item.placesCount} (из ${item.totalPlacesCount} всего)`,
+    placeLabel,
     `Места: ${item.places.join(', ')}`,
     item.priceByn ? `Цена BYN: ${item.priceByn}` : null
   ]
@@ -198,7 +198,7 @@ export default async function handler(req, res) {
       .filter(Boolean),
     minAvailable: process.env.MIN_AVAILABLE ? Number(process.env.MIN_AVAILABLE) : 1,
     maxResults: process.env.MAX_RESULTS ? Number(process.env.MAX_RESULTS) : 5,
-    seatFilter: process.env.SEAT_FILTER || 'lower_non_side',
+    seatFilter: process.env.SEAT_FILTER || 'all',
     telegramToken: process.env.TELEGRAM_BOT_TOKEN,
     telegramChatId: process.env.TELEGRAM_CHAT_ID,
     schedulerToken: process.env.SCHEDULER_TOKEN || process.env.CRON_SECRET,
