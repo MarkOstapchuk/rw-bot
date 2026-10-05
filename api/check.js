@@ -104,22 +104,84 @@ function filterItems(items, cfg) {
   });
 }
 
+function formatPlacesByCategory(places, carriageType = '') {
+  const isCoupe = /купе/i.test(carriageType);
+  const lower = [];
+  const upper = [];
+  const sideLower = [];
+  const sideUpper = [];
+  const other = [];
+
+  for (const place of places) {
+    const num = Number(place);
+    if (Number.isNaN(num)) {
+      other.push(place);
+      continue;
+    }
+
+    if (!isCoupe && num >= 37 && num <= 54) {
+      if (num % 2 !== 0) {
+        sideLower.push(num);
+      } else {
+        sideUpper.push(num);
+      }
+    } else if (num >= 1 && num <= 36) {
+      if (num % 2 !== 0) {
+        lower.push(num);
+      } else {
+        upper.push(num);
+      }
+    } else {
+      other.push(num);
+    }
+  }
+
+  const sortAsc = (a, b) => a - b;
+  lower.sort(sortAsc);
+  upper.sort(sortAsc);
+  sideLower.sort(sortAsc);
+  sideUpper.sort(sortAsc);
+
+  const parts = [];
+  if (lower.length > 0) {
+    parts.push(`  • Нижние (${lower.length}): ${lower.join(', ')}`);
+  }
+  if (upper.length > 0) {
+    parts.push(`  • Верхние (${upper.length}): ${upper.join(', ')}`);
+  }
+  if (sideLower.length > 0) {
+    parts.push(`  • Боковые нижние (${sideLower.length}): ${sideLower.join(', ')}`);
+  }
+  if (sideUpper.length > 0) {
+    parts.push(`  • Боковые верхние (${sideUpper.length}): ${sideUpper.join(', ')}`);
+  }
+  if (other.length > 0) {
+    parts.push(`  • Другие места (${other.length}): ${other.join(', ')}`);
+  }
+
+  return parts.length > 0 ? parts.join('\n') : `Места: ${places.join(', ')}`;
+}
+
 function formatItem(item, index, seatFilter = 'all') {
   const header =
     `${index + 1}. Поезд ${item.trainNumber} (${item.trainType}) ` +
     `${item.from} -> ${item.to}, ${item.date} ${item.departureTime}`;
 
-  const placeLabel =
-    seatFilter === 'lower_non_side'
-      ? `Свободно нижних (не боковых) мест: ${item.placesCount} (из ${item.totalPlacesCount} всего)`
-      : seatFilter === 'lower'
-        ? `Свободно нижних мест: ${item.placesCount} (из ${item.totalPlacesCount} всего)`
-        : `Свободно мест: ${item.placesCount}`;
+  let placesSection;
+  if (seatFilter === 'all') {
+    const categorized = formatPlacesByCategory(item.places, item.carriageType);
+    placesSection = `Свободно мест: ${item.placesCount}\n${categorized}`;
+  } else {
+    const placeLabel =
+      seatFilter === 'lower_non_side'
+        ? `Свободно нижних (не боковых) мест: ${item.placesCount} (из ${item.totalPlacesCount} всего)`
+        : `Свободно нижних мест: ${item.placesCount} (из ${item.totalPlacesCount} всего)`;
+    placesSection = `${placeLabel}\nМеста: ${item.places.join(', ')}`;
+  }
 
   const body = [
     `Вагон: ${item.carriageNumber} (${item.carriageType})`,
-    placeLabel,
-    `Места: ${item.places.join(', ')}`,
+    placesSection,
     item.priceByn ? `Цена BYN: ${item.priceByn}` : null
   ]
     .filter(Boolean)
